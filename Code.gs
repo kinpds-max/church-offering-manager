@@ -424,8 +424,8 @@ function doPost(e) {
 }
 
 function setupIfNeeded_() {
-  var ss = getSpreadsheet_();
-  if (!ss.getSheetByName(SHEET_NAME)) {
-    setupSheet();
-  }
+  // 매 요청마다 실행하여 기존 시트에 성도이름 등 신규 컬럼이 없으면
+  // 자동으로 마이그레이션되도록 합니다. setupSheet()는 이미 존재하는
+  // 시트/컬럼은 건드리지 않으므로 반복 호출해도 안전합니다.
+  setupSheet();
 }

@@ -156,6 +156,57 @@
   .field.full input { width: 100%; }
   small.hint { color: var(--muted); font-size: 11px; }
   .report-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .type-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .type-tabs button {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .type-tabs button.active {
+    background: var(--navy);
+    color: #fff;
+    border-color: var(--navy);
+  }
+  .table-wrap { overflow-x: auto; }
+  table.entry-table { width: 100%; border-collapse: collapse; }
+  table.entry-table th {
+    text-align: left;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.entry-table td {
+    padding: 3px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.entry-table td:last-child { width: 36px; padding: 3px 6px; }
+  table.entry-table input.cell-input {
+    width: 100%;
+    border: 1px solid transparent;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    background: transparent;
+  }
+  table.entry-table input.cell-input:focus {
+    border-color: var(--navy);
+    background: #fff;
+    outline: none;
+  }
+  table.entry-table .row-del {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 4px 8px;
+  }
   @media print {
     header, nav, .no-print { display: none !important; }
     main { margin: 0; max-width: 100%; }
@@ -209,24 +260,29 @@
             <label>날짜 (주일)</label>
             <input type="date" id="inputDate">
           </div>
-          <div class="field">
-            <label>헌금종류</label>
-            <select id="inputType"></select>
-          </div>
-          <div class="field">
-            <label>성도 이름</label>
-            <input type="text" id="inputName" placeholder="이름">
-          </div>
-          <div class="field">
-            <label>금액</label>
-            <input type="number" id="inputAmount" min="0" step="1000" placeholder="0">
-          </div>
         </div>
-        <div class="field full" style="margin-bottom:12px;">
-          <label>비고</label>
-          <input type="text" id="inputNote" placeholder="특이사항이 있으면 입력하세요 (선택)">
+
+        <div class="type-tabs" id="typeTabs"></div>
+
+        <div class="table-wrap">
+          <table class="entry-table" id="entryTable">
+            <thead>
+              <tr>
+                <th style="width:35%;">성도 이름</th>
+                <th style="width:25%;">금액</th>
+                <th>비고</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="entryTableBody"></tbody>
+          </table>
         </div>
-        <button class="primary" onclick="saveRecord()">추가</button>
+
+        <div class="row" style="margin-top:10px;">
+          <button class="ghost" type="button" onclick="addInputRow(true)">+ 행 추가</button>
+          <button class="primary" type="button" onclick="saveRecord()">저장</button>
+        </div>
+        <small class="hint">이름 입력 후 → 또는 Enter로 다음 칸/다음 줄로 이동할 수 있어요. 마지막 줄에서 Enter를 누르면 새 줄이 자동으로 추가됩니다.</small>
         <div id="inputMsg"></div>
       </div>
 
@@ -321,6 +377,7 @@
 let API_URL = localStorage.getItem('gs_apiUrl') || '';
 let PASSWORD = localStorage.getItem('gs_password') || '';
 let OFFERING_TYPES = [];
+let selectedType = '';
 let currentPeriod = 'week';
 let lastReportData = null;
 
@@ -436,6 +493,7 @@ async function initApp() {
   renderOfferingInputs();
   populateYearSelects();
   refreshDateEntries();
+  setupEntryTableKeyboard();
 
   document.querySelectorAll('nav button').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -450,9 +508,114 @@ function switchTab(tab) {
   });
 }
 
+// ---------- 입력 탭: 헌금종류 탭 ----------
+
 function renderOfferingInputs() {
-  const sel = document.getElementById('inputType');
-  sel.innerHTML = OFFERING_TYPES.map(t => '<option value="' + t + '">' + t + '</option>').join('');
+  const wrap = document.getElementById('typeTabs');
+  wrap.innerHTML = OFFERING_TYPES.map(t =>
+    '<button type="button" data-type="' + t + '" onclick="selectType(\'' + t.replace(/'/g, "\\'") + '\')">' + t + '</button>'
+  ).join('');
+  if (!selectedType || OFFERING_TYPES.indexOf(selectedType) === -1) {
+    selectedType = OFFERING_TYPES[0] || '';
+  }
+  updateTypeTabsUI();
+  resetInputTable();
+}
+
+function updateTypeTabsUI() {
+  document.querySelectorAll('#typeTabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === selectedType);
+  });
+}
+
+function selectType(t) {
+  selectedType = t;
+  updateTypeTabsUI();
+  resetInputTable();
+}
+
+// ---------- 입력 탭: 스프레드시트 스타일 표 ----------
+
+function resetInputTable() {
+  const tbody = document.getElementById('entryTableBody');
+  tbody.innerHTML = '';
+  addInputRow(false);
+}
+
+function addInputRow(focus) {
+  const tbody = document.getElementById('entryTableBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><input type="text" class="cell-input" data-col="0" placeholder="이름"></td>' +
+    '<td><input type="text" inputmode="numeric" class="cell-input" data-col="1" placeholder="0"></td>' +
+    '<td><input type="text" class="cell-input" data-col="2" placeholder="비고 (선택)"></td>' +
+    '<td><button type="button" class="row-del" onclick="removeInputRow(this)">✕</button></td>';
+  tbody.appendChild(tr);
+  if (focus) {
+    const firstInput = tr.querySelector('input');
+    if (firstInput) firstInput.focus();
+  }
+  return tr;
+}
+
+function removeInputRow(btn) {
+  const tbody = document.getElementById('entryTableBody');
+  const tr = btn.closest('tr');
+  if (tbody.children.length > 1) {
+    tr.remove();
+  } else {
+    tr.querySelectorAll('input').forEach(i => i.value = '');
+  }
+}
+
+function focusCell(rowIdx, col) {
+  const rows = document.querySelectorAll('#entryTableBody tr');
+  const row = rows[rowIdx];
+  if (!row) return false;
+  const inputs = row.querySelectorAll('input');
+  const input = inputs[col];
+  if (input) {
+    input.focus();
+    if (input.setSelectionRange) {
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
+    }
+    return true;
+  }
+  return false;
+}
+
+function setupEntryTableKeyboard() {
+  const table = document.getElementById('entryTable');
+  if (!table || table.dataset.kbBound) return;
+  table.dataset.kbBound = '1';
+  table.addEventListener('keydown', function (e) {
+    const target = e.target;
+    if (!target.classList || !target.classList.contains('cell-input')) return;
+    const td = target.closest('td');
+    const tr = td.closest('tr');
+    const rows = Array.from(document.querySelectorAll('#entryTableBody tr'));
+    const rowIdx = rows.indexOf(tr);
+    const col = Number(target.dataset.col);
+
+    if (e.key === 'ArrowRight' && target.selectionStart === target.value.length) {
+      e.preventDefault(); focusCell(rowIdx, col + 1);
+    } else if (e.key === 'ArrowLeft' && target.selectionStart === 0) {
+      e.preventDefault(); focusCell(rowIdx, col - 1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault(); focusCell(rowIdx + 1, col);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault(); focusCell(rowIdx - 1, col);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (rowIdx === rows.length - 1) {
+        addInputRow(false);
+        setTimeout(() => focusCell(rowIdx + 1, col), 0);
+      } else {
+        focusCell(rowIdx + 1, col);
+      }
+    }
+  });
 }
 
 function populateYearSelects() {
@@ -468,27 +631,33 @@ function populateYearSelects() {
     .map(m => '<option value="' + m + '"' + (m === now.getMonth()+1 ? ' selected' : '') + '>' + m + '월</option>').join('');
 }
 
-// ---------- 입력 탭 ----------
+// ---------- 입력 탭: 저장 ----------
 
 async function saveRecord() {
   const date = document.getElementById('inputDate').value;
-  const type = document.getElementById('inputType').value;
-  const name = document.getElementById('inputName').value.trim();
-  const amount = Number(document.getElementById('inputAmount').value);
-  const note = document.getElementById('inputNote').value.trim();
   const msgEl = document.getElementById('inputMsg');
-
   if (!date) { msgEl.innerHTML = '<div class="msg err">날짜를 선택하세요.</div>'; return; }
-  if (!type) { msgEl.innerHTML = '<div class="msg err">헌금종류를 선택하세요.</div>'; return; }
-  if (!amount || amount <= 0) { msgEl.innerHTML = '<div class="msg err">금액을 입력하세요.</div>'; return; }
+  if (!selectedType) { msgEl.innerHTML = '<div class="msg err">헌금종류를 선택하세요.</div>'; return; }
+
+  const rows = document.querySelectorAll('#entryTableBody tr');
+  const entries = [];
+  rows.forEach(tr => {
+    const inputs = tr.querySelectorAll('input');
+    const name = (inputs[0].value || '').trim();
+    const amount = Number(String(inputs[1].value || '').replace(/[^0-9.-]/g, ''));
+    const note = (inputs[2].value || '').trim();
+    if (amount > 0) {
+      entries.push({ type: selectedType, name: name, amount: amount, note: note });
+    }
+  });
+
+  if (entries.length === 0) { msgEl.innerHTML = '<div class="msg err">금액이 입력된 행이 없습니다.</div>'; return; }
 
   msgEl.innerHTML = '<div class="msg">저장 중...</div>';
   try {
-    const result = await apiPost('addRecord', { date: date, entries: [{ type: type, name: name, amount: amount, note: note }] });
-    msgEl.innerHTML = '<div class="msg ok">저장되었습니다.</div>';
-    document.getElementById('inputName').value = '';
-    document.getElementById('inputAmount').value = '';
-    document.getElementById('inputNote').value = '';
+    const result = await apiPost('addRecord', { date: date, entries: entries });
+    msgEl.innerHTML = '<div class="msg ok">' + result.added + '건 저장되었습니다.</div>';
+    resetInputTable();
     refreshDateEntries();
   } catch (e) {
     msgEl.innerHTML = '<div class="msg err">저장 실패: ' + e.message + '</div>';
