@@ -13,6 +13,11 @@
  *    - 실행 계정: 나(Me)
  *    - 액세스 권한: 전체(Anyone)
  * 4) 배포 후 나오는 웹 앱 URL을 index.html 설정 화면에 입력
+ *
+ * [통신 방식]
+ * GitHub Pages 등 외부 도메인에서 fetch()로 호출하면 브라우저 CORS 정책에
+ * 막히는 경우가 있어, 모든 요청(조회/저장/삭제 포함)을 GET + JSONP 방식으로
+ * 처리합니다. entries/offeringTypes 같은 배열 값은 JSON 문자열로 전달됩니다.
  */
 
 const SPREADSHEET_ID = ''; // 독립 실행형으로 쓸 경우 여기에 스프레드시트 ID를 입력하세요
@@ -121,7 +126,6 @@ function checkPassword_(password) {
   const props = PropertiesService.getScriptProperties();
   const stored = props.getProperty('ADMIN_PASSWORD');
   if (!stored) {
-    // 최초 실행: 처음 입력하는 비밀번호를 등록
     if (!password) return false;
     props.setProperty('ADMIN_PASSWORD', password);
     return true;
@@ -130,7 +134,6 @@ function checkPassword_(password) {
 }
 
 function toDateKey_(dateInput) {
-  // dateInput: 'yyyy-MM-dd' 문자열 또는 Date 객체
   const d = (dateInput instanceof Date) ? dateInput : new Date(dateInput + 'T00:00:00');
   return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
@@ -181,7 +184,7 @@ function actionAddRecord_(payload) {
   const year = d.getFullYear();
   const month = d.getMonth() + 1;
   const wom = weekOfMonth_(d);
-  const entries = payload.entries || []; // [{type, amount}]
+  const entries = payload.entries || [];
   const now = new Date();
   let added = 0;
 
@@ -226,7 +229,6 @@ function actionGetMonth_(payload) {
   const records = all.filter(r => r.year === year && r.month === month);
   const types = getOfferingTypes_();
 
-  // 주(날짜)별 그룹
   const byDate = {};
   records.forEach(r => {
     if (!byDate[r.date]) byDate[r.date] = [];
@@ -349,47 +351,67 @@ function routeAction_(action, payload) {
   }
 }
 
-function jsonOut_(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+// ---------- 응답 처리 (JSONP 지원) ----------
+
+function normalizeParams_(raw) {
+  const params = {};
+  Object.keys(raw).forEach(k => { params[k] = raw[k]; });
+  ['entries', 'offeringTypes'].forEach(key => {
+    if (typeof params[key] === 'string' && params[key]) {
+      try { params[key] = JSON.parse(params[key]); } catch (e) { /* 그대로 둠 */ }
+    }
+  });
+  return params;
+}
+
+function respond_(rawParams, obj) {
+  const json = JSON.stringify(obj);
+  const callback = rawParams && rawParams.callback;
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + json + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doGet(e) {
+  var raw = (e && e.parameter) || {};
   try {
     setupIfNeeded_();
-    const params = e.parameter || {};
-    const action = params.action;
+    var params = normalizeParams_(raw);
+    var action = params.action;
 
     if (action !== 'ping' && !checkPassword_(params.password)) {
-      return jsonOut_({ error: 'unauthorized' });
+      return respond_(raw, { error: 'unauthorized' });
     }
-    const result = routeAction_(action, params);
-    return jsonOut_({ result: result });
+    var result = routeAction_(action, params);
+    return respond_(raw, { result: result });
   } catch (err) {
-    return jsonOut_({ error: String(err) });
+    return respond_(raw, { error: String(err) });
   }
 }
 
 function doPost(e) {
+  var raw = (e && e.parameter) || {};
   try {
     setupIfNeeded_();
-    let body = {};
+    var body = {};
     if (e.postData && e.postData.contents) {
       body = JSON.parse(e.postData.contents);
     }
-    const action = body.action;
+    var action = body.action;
     if (!checkPassword_(body.password)) {
-      return jsonOut_({ error: 'unauthorized' });
+      return respond_(raw, { error: 'unauthorized' });
     }
-    const result = routeAction_(action, body);
-    return jsonOut_({ result: result });
+    var result = routeAction_(action, body);
+    return respond_(raw, { result: result });
   } catch (err) {
-    return jsonOut_({ error: String(err) });
+    return respond_(raw, { error: String(err) });
   }
 }
 
 function setupIfNeeded_() {
-  const ss = getSpreadsheet_();
+  var ss = getSpreadsheet_();
   if (!ss.getSheetByName(SHEET_NAME)) {
     setupSheet();
   }
