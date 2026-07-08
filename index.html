@@ -616,6 +616,22 @@ function setupEntryTableKeyboard() {
       }
     }
   });
+
+  // 스프레드시트처럼 마지막 줄에 값을 입력하기 시작하면 자동으로
+  // 빈 줄을 하나 더 추가해, 행이 부족해 수동으로 추가할 필요가 없게 합니다.
+  table.addEventListener('input', function (e) {
+    const target = e.target;
+    if (!target.classList || !target.classList.contains('cell-input')) return;
+    const rows = document.querySelectorAll('#entryTableBody tr');
+    const lastRow = rows[rows.length - 1];
+    if (!lastRow) return;
+    const tr = target.closest('tr');
+    if (tr !== lastRow) return;
+    const hasValue = Array.from(lastRow.querySelectorAll('input')).some(i => i.value.trim() !== '');
+    if (hasValue) {
+      addInputRow(false);
+    }
+  });
 }
 
 function populateYearSelects() {
