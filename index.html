@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>하맘 교회회계관리</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<meta name="robots" content="noindex, nofollow">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
   :root {
     --navy: #1f3a5f;
@@ -236,7 +237,7 @@
   </div>
   <footer style="text-align:center;padding:16px 16px 20px;color:var(--muted);font-size:12px;line-height:1.9;">
     <div>ⓒ 하맘컨텐츠 · 1660-1195 (문자가능)</div>
-    <div>프로그램구입·구독문의 &nbsp;|&nbsp; 교회맞춤프로그램·자동화문의 &nbsp;|&nbsp; 홈페이지·어플문의 &nbsp;|&nbsp; 작동문의</div>
+    <div>프로그램구입·구독문의 &nbsp;|&nbsp; 교회맞춤프로그램·자동화문의 &nbsp;|&nbsp; 홈페이지·어플문의 &nbsp;|&nbsp; 작동문의</div><div>유아매트시공문의 &nbsp;|&nbsp; 교회성도대상 층간소음·유아·노인·반려동물매트 시공할인문의</div>
   </footer>
 </div>
 
@@ -420,7 +421,7 @@
   </main>
   <footer style="text-align:center;padding:16px 16px 20px;color:var(--muted);font-size:12px;line-height:1.9;">
     <div>ⓒ 하맘컨텐츠 · 1660-1195 (문자가능)</div>
-    <div>프로그램구입·구독문의 &nbsp;|&nbsp; 교회맞춤프로그램·자동화문의 &nbsp;|&nbsp; 홈페이지·어플문의 &nbsp;|&nbsp; 작동문의</div>
+    <div>프로그램구입·구독문의 &nbsp;|&nbsp; 교회맞춤프로그램·자동화문의 &nbsp;|&nbsp; 홈페이지·어플문의 &nbsp;|&nbsp; 작동문의</div><div>유아매트시공문의 &nbsp;|&nbsp; 교회성도대상 층간소음·유아·노인·반려동물매트 시공할인문의</div>
   </footer>
 </div>
 
@@ -947,6 +948,11 @@ function renderDetailTable(kind, data) {
 }
 
 function renderChartView(kind, data) {
+  if (typeof Chart === 'undefined') {
+    document.getElementById('subview-chart').innerHTML =
+      '<div class="msg err">그래픽 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침 해주세요.</div>';
+    return;
+  }
   const types = data.offeringTypes;
   const typeCtx = document.getElementById('typeChart');
   if (typeChartInstance) { typeChartInstance.destroy(); }
