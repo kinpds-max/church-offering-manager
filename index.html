@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재정실 헌금관리</title>
+<style>
+  :root {
+    --navy: #1f3a5f;
+    --navy-dark: #16283f;
+    --gold: #b8934a;
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --border: #e1e6ec;
+    --text: #29344a;
+    --muted: #7a8699;
+    --danger: #c0463f;
+    --ok: #2f7d52;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: var(--navy);
+    color: #fff;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: 0.3px; }
+  header .sub { font-size: 12px; color: #cdd8e6; margin-top: 2px; }
+  #logoutBtn {
+    background: transparent;
+    border: 1px solid #4b6584;
+    color: #dce6f2;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  nav {
+    display: flex;
+    background: var(--navy-dark);
+    padding: 0 16px;
+  }
+  nav button {
+    background: none;
+    border: none;
+    color: #b7c4d6;
+    padding: 12px 18px;
+    font-size: 14px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+  }
+  nav button.active {
+    color: #fff;
+    border-bottom-color: var(--gold);
+    font-weight: 600;
+  }
+  main {
+    max-width: 880px;
+    margin: 24px auto;
+    padding: 0 16px 60px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 18px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 14px; color: var(--navy); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  label { font-size: 12px; color: var(--muted); }
+  input[type=text], input[type=password], input[type=date], input[type=number], input[type=email], select, textarea {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 10px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text);
+  }
+  textarea { resize: vertical; min-height: 44px; }
+  .offering-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .offering-grid .field input { width: 100%; }
+  button.primary {
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.primary:hover { background: var(--navy-dark); }
+  button.ghost {
+    background: #fff;
+    color: var(--navy);
+    border: 1px solid var(--navy);
+    padding: 9px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button.ghost:hover { background: #eef2f7; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  tfoot td { font-weight: 700; color: var(--navy); border-top: 2px solid var(--navy); }
+  .msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; margin-top: 8px; }
+  .msg.ok { background: #e7f3ec; color: var(--ok); }
+  .msg.err { background: #fbe9e8; color: var(--danger); }
+  .hidden { display: none !important; }
+  .period-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+  .period-toggle button {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .period-toggle button.active {
+    background: var(--navy);
+    color: #fff;
+    border-color: var(--navy);
+  }
+  .entry-list { margin-top: 10px; }
+  .entry-list .item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px;
+  }
+  .entry-list .item button { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; }
+  .setup-wrap {
+    max-width: 420px; margin: 80px auto; padding: 0 16px;
+  }
+  .setup-wrap .card { padding: 28px 26px; }
+  .setup-wrap h1 { font-size: 20px; color: var(--navy); margin-bottom: 4px; }
+  .setup-wrap p.desc { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+  .field.full { width: 100%; }
+  .field.full input { width: 100%; }
+  small.hint { color: var(--muted); font-size: 11px; }
+  .report-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  @media print {
+    header, nav, .no-print { display: none !important; }
+    main { margin: 0; max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="setupScreen" class="setup-wrap hidden">
+  <div class="card">
+    <h1>재정실 헌금관리</h1>
+    <p class="desc">Google Apps Script 웹 앱 URL과 재정실 공용 비밀번호를 입력하세요.<br>최초 1회만 설정하면 됩니다.</p>
+    <div class="field full" style="margin-bottom:12px;">
+      <label>Apps Script 웹 앱 URL</label>
+      <input type="text" id="setupUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <div class="field full" style="margin-bottom:16px;">
+      <label>비밀번호</label>
+      <input type="password" id="setupPw" placeholder="재정실 공용 비밀번호">
+      <small class="hint">처음 설정 시 여기서 입력한 값이 새 비밀번호로 등록됩니다.</small>
+    </div>
+    <button class="primary" onclick="connectSetup()">연결하기</button>
+    <div id="setupMsg"></div>
+  </div>
+</div>
+
+<div id="appScreen" class="hidden">
+  <header>
+    <div>
+      <h1>재정실 헌금관리</h1>
+      <div class="sub">교회 헌금 기록 · 주별/월별/연간 보고서</div>
+    </div>
+    <button id="logoutBtn" onclick="logout()">연결 해제</button>
+  </header>
+  <nav>
+    <button data-tab="input" class="active">헌금입력</button>
+    <button data-tab="report">보고서</button>
+    <button data-tab="settings">설정</button>
+  </nav>
+
+  <main>
+    <!-- 입력 탭 -->
+    <section id="tab-input">
+      <div class="card">
+        <h2>헌금 입력</h2>
+        <div class="row">
+          <div class="field">
+            <label>날짜 (주일)</label>
+            <input type="date" id="inputDate">
+          </div>
+        </div>
+        <div class="offering-grid" id="offeringInputs"></div>
+        <div class="field full" style="margin-bottom:12px;">
+          <label>비고</label>
+          <textarea id="inputNote" placeholder="특이사항이 있으면 입력하세요"></textarea>
+        </div>
+        <button class="primary" onclick="saveRecord()">저장</button>
+        <div id="inputMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2>선택한 날짜의 입력 내역</h2>
+        <div id="dateEntryList" class="entry-list"><small class="hint">날짜를 선택하면 해당 주 입력 내역이 표시됩니다.</small></div>
+      </div>
+    </section>
+
+    <!-- 보고서 탭 -->
+    <section id="tab-report" class="hidden">
+      <div class="card">
+        <h2>보고서 선택</h2>
+        <div class="period-toggle">
+          <button data-period="week" class="active" onclick="setPeriod('week')">주별 보고서</button>
+          <button data-period="month" onclick="setPeriod('month')">월별 보고서</button>
+          <button data-period="year" onclick="setPeriod('year')">연간 보고서</button>
+        </div>
+
+        <div id="periodControls-week" class="row">
+          <div class="field">
+            <label>날짜 선택 (해당 주)</label>
+            <input type="date" id="reportWeekDate">
+          </div>
+          <button class="primary" onclick="loadReport()">조회</button>
+        </div>
+        <div id="periodControls-month" class="row hidden">
+          <div class="field">
+            <label>년도</label>
+            <select id="reportYearM"></select>
+          </div>
+          <div class="field">
+            <label>월</label>
+            <select id="reportMonth"></select>
+          </div>
+          <button class="primary" onclick="loadReport()">조회</button>
+        </div>
+        <div id="periodControls-year" class="row hidden">
+          <div class="field">
+            <label>년도</label>
+            <select id="reportYearY"></select>
+          </div>
+          <button class="primary" onclick="loadReport()">조회</button>
+        </div>
+      </div>
+
+      <div class="card" id="reportResultCard" style="display:none;">
+        <h2 id="reportTitle"></h2>
+        <div id="reportTable"></div>
+        <div class="report-actions no-print">
+          <button class="ghost" onclick="downloadCSV()">CSV 다운로드</button>
+          <button class="ghost" onclick="window.print()">인쇄 / PDF 저장</button>
+          <button class="ghost" onclick="emailReport()">이메일로 받기</button>
+        </div>
+        <div id="reportMsg"></div>
+      </div>
+    </section>
+
+    <!-- 설정 탭 -->
+    <section id="tab-settings" class="hidden">
+      <div class="card">
+        <h2>헌금 종류 관리</h2>
+        <div class="field full" style="margin-bottom:10px;">
+          <label>헌금 종류 (쉼표로 구분)</label>
+          <input type="text" id="offeringTypesInput">
+        </div>
+        <button class="primary" onclick="saveOfferingTypes()">저장</button>
+        <div id="typesMsg"></div>
+      </div>
+      <div class="card">
+        <h2>보고서 수신 이메일</h2>
+        <div class="field full" style="margin-bottom:10px;">
+          <label>이메일 주소</label>
+          <input type="email" id="reportEmailInput" placeholder="finance@example.com">
+        </div>
+        <button class="primary" onclick="saveReportEmail()">저장</button>
+        <div id="emailMsg"></div>
+      </div>
+      <div class="card">
+        <h2>연결 정보</h2>
+        <p style="font-size:13px;color:var(--muted);">Apps Script URL: <span id="curApiUrl"></span></p>
+        <button class="ghost" onclick="logout()">연결 해제 (URL/비밀번호 다시 입력)</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+let API_URL = localStorage.getItem('gs_apiUrl') || '';
+let PASSWORD = localStorage.getItem('gs_password') || '';
+let OFFERING_TYPES = [];
+let currentPeriod = 'week';
+let lastReportData = null;
+
+function fmtWon(n) { return (Number(n)||0).toLocaleString('ko-KR') + '원'; }
+function todayStr() { const d = new Date(); return d.toISOString().slice(0,10); }
+
+async function apiGet(action, params) {
+  const usp = new URLSearchParams(Object.assign({ action, password: PASSWORD }, params || {}));
+  const res = await fetch(API_URL + '?' + usp.toString(), { method: 'GET' });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json.result;
+}
+
+async function apiPost(action, payload) {
+  const body = Object.assign({ action, password: PASSWORD }, payload || {});
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json.result;
+}
+
+// ---------- 초기 설정 화면 ----------
+
+function showSetup() {
+  document.getElementById('setupScreen').classList.remove('hidden');
+  document.getElementById('appScreen').classList.add('hidden');
+  document.getElementById('setupUrl').value = API_URL;
+}
+
+async function connectSetup() {
+  const url = document.getElementById('setupUrl').value.trim();
+  const pw = document.getElementById('setupPw').value;
+  const msgEl = document.getElementById('setupMsg');
+  msgEl.innerHTML = '<div class="msg">연결 확인 중...</div>';
+  if (!url || !pw) {
+    msgEl.innerHTML = '<div class="msg err">URL과 비밀번호를 모두 입력하세요.</div>';
+    return;
+  }
+  API_URL = url; PASSWORD = pw;
+  try {
+    await apiGet('ping', {});
+    const settings = await apiGet('getSettings', {});
+    localStorage.setItem('gs_apiUrl', API_URL);
+    localStorage.setItem('gs_password', PASSWORD);
+    msgEl.innerHTML = '<div class="msg ok">연결되었습니다.</div>';
+    OFFERING_TYPES = settings.offeringTypes || [];
+    setTimeout(initApp, 400);
+  } catch (e) {
+    msgEl.innerHTML = '<div class="msg err">연결 실패: ' + e.message + ' (URL 또는 비밀번호를 확인하세요)</div>';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('gs_apiUrl');
+  localStorage.removeItem('gs_password');
+  API_URL = ''; PASSWORD = '';
+  showSetup();
+}
+
+// ---------- 앱 초기화 ----------
+
+async function initApp() {
+  document.getElementById('setupScreen').classList.add('hidden');
+  document.getElementById('appScreen').classList.remove('hidden');
+  document.getElementById('curApiUrl').textContent = API_URL;
+  document.getElementById('inputDate').value = todayStr();
+  document.getElementById('reportWeekDate').value = todayStr();
+
+  try {
+    const settings = await apiGet('getSettings', {});
+    OFFERING_TYPES = settings.offeringTypes || [];
+    document.getElementById('offeringTypesInput').value = OFFERING_TYPES.join(', ');
+    document.getElementById('reportEmailInput').value = settings.reportEmail || '';
+  } catch (e) {
+    alert('설정 불러오기 실패: ' + e.message);
+  }
+
+  renderOfferingInputs();
+  populateYearSelects();
+  refreshDateEntries();
+
+  document.querySelectorAll('nav button').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  document.getElementById('inputDate').addEventListener('change', refreshDateEntries);
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['input','report','settings'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+  });
+}
+
+function renderOfferingInputs() {
+  const wrap = document.getElementById('offeringInputs');
+  wrap.innerHTML = '';
+  OFFERING_TYPES.forEach(type => {
+    const div = document.createElement('div');
+    div.className = 'field';
+    div.innerHTML = '<label>' + type + '</label><input type="number" min="0" step="1000" data-type="' + type + '" placeholder="0">';
+    wrap.appendChild(div);
+  });
+}
+
+function populateYearSelects() {
+  const now = new Date();
+  const years = [];
+  for (let y = now.getFullYear() - 3; y <= now.getFullYear() + 1; y++) years.push(y);
+  ['reportYearM', 'reportYearY'].forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === now.getFullYear() ? ' selected' : '') + '>' + y + '년</option>').join('');
+  });
+  const monthSel = document.getElementById('reportMonth');
+  monthSel.innerHTML = Array.from({length:12}, (_,i)=>i+1)
+    .map(m => '<option value="' + m + '"' + (m === now.getMonth()+1 ? ' selected' : '') + '>' + m + '월</option>').join('');
+}
+
+// ---------- 입력 탭 ----------
+
+async function saveRecord() {
+  const date = document.getElementById('inputDate').value;
+  const note = document.getElementById('inputNote').value;
+  const msgEl = document.getElementById('inputMsg');
+  if (!date) { msgEl.innerHTML = '<div class="msg err">날짜를 선택하세요.</div>'; return; }
+
+  const entries = [];
+  document.querySelectorAll('#offeringInputs input').forEach(inp => {
+    const amount = Number(inp.value);
+    if (amount > 0) entries.push({ type: inp.dataset.type, amount: amount });
+  });
+  if (entries.length === 0) { msgEl.innerHTML = '<div class="msg err">최소 한 항목 이상 금액을 입력하세요.</div>'; return; }
+
+  msgEl.innerHTML = '<div class="msg">저장 중...</div>';
+  try {
+    const result = await apiPost('addRecord', { date, note, entries });
+    msgEl.innerHTML = '<div class="msg ok">' + result.added + '건 저장되었습니다.</div>';
+    document.querySelectorAll('#offeringInputs input').forEach(inp => inp.value = '');
+    document.getElementById('inputNote').value = '';
+    refreshDateEntries();
+  } catch (e) {
+    msgEl.innerHTML = '<div class="msg err">저장 실패: ' + e.message + '</div>';
+  }
+}
+
+async function refreshDateEntries() {
+  const date = document.getElementById('inputDate').value;
+  const listEl = document.getElementById('dateEntryList');
+  if (!date) return;
+  listEl.innerHTML = '<small class="hint">불러오는 중...</small>';
+  try {
+    const data = await apiGet('getWeek', { date });
+    if (data.records.length === 0) {
+      listEl.innerHTML = '<small class="hint">해당 날짜에 입력된 기록이 없습니다.</small>';
+      return;
+    }
+    listEl.innerHTML = data.records.map(r =>
+      '<div class="item"><span>' + r.type + ' - ' + fmtWon(r.amount) + (r.note ? ' (' + r.note + ')' : '') + '</span>' +
+      '<button onclick="deleteRecord(\'' + r.id + '\')">삭제</button></div>'
+    ).join('') + '<div class="item" style="border:none;font-weight:700;"><span>합계</span><span>' + fmtWon(data.summary.total) + '</span></div>';
+  } catch (e) {
+    listEl.innerHTML = '<div class="msg err">불러오기 실패: ' + e.message + '</div>';
+  }
+}
+
+async function deleteRecord(id) {
+  if (!confirm('이 항목을 삭제할까요?')) return;
+  try {
+    await apiPost('deleteRecord', { id });
+    refreshDateEntries();
+  } catch (e) {
+    alert('삭제 실패: ' + e.message);
+  }
+}
+
+// ---------- 보고서 탭 ----------
+
+function setPeriod(p) {
+  currentPeriod = p;
+  document.querySelectorAll('.period-toggle button').forEach(b => b.classList.toggle('active', b.dataset.period === p));
+  ['week','month','year'].forEach(pp => {
+    document.getElementById('periodControls-' + pp).classList.toggle('hidden', pp !== p);
+  });
+  document.getElementById('reportResultCard').style.display = 'none';
+}
+
+async function loadReport() {
+  const card = document.getElementById('reportResultCard');
+  const titleEl = document.getElementById('reportTitle');
+  const tableEl = document.getElementById('reportTable');
+  const msgEl = document.getElementById('reportMsg');
+  msgEl.innerHTML = '';
+  card.style.display = 'block';
+  tableEl.innerHTML = '<small class="hint">불러오는 중...</small>';
+
+  try {
+    if (currentPeriod === 'week') {
+      const date = document.getElementById('reportWeekDate').value;
+      const data = await apiGet('getWeek', { date });
+      lastReportData = { kind: 'week', params: { date }, data };
+      titleEl.textContent = '주별 보고서 - ' + date;
+      tableEl.innerHTML = renderTypeTable(data.summary, data.offeringTypes);
+    } else if (currentPeriod === 'month') {
+      const year = document.getElementById('reportYearM').value;
+      const month = document.getElementById('reportMonth').value;
+      const data = await apiGet('getMonth', { year, month });
+      lastReportData = { kind: 'month', params: { year, month }, data };
+      titleEl.textContent = '월별 보고서 - ' + year + '년 ' + month + '월';
+      tableEl.innerHTML = renderMonthTable(data);
+    } else {
+      const year = document.getElementById('reportYearY').value;
+      const data = await apiGet('getYear', { year });
+      lastReportData = { kind: 'year', params: { year }, data };
+      titleEl.textContent = '연간 보고서 - ' + year + '년';
+      tableEl.innerHTML = renderYearTable(data);
+    }
+  } catch (e) {
+    tableEl.innerHTML = '<div class="msg err">불러오기 실패: ' + e.message + '</div>';
+  }
+}
+
+function renderTypeTable(summary, types) {
+  let rows = types.map(t => '<tr><td>' + t + '</td><td>' + fmtWon(summary.byType[t]) + '</td></tr>').join('');
+  return '<table><thead><tr><th>헌금종류</th><th>금액</th></tr></thead><tbody>' + rows +
+    '</tbody><tfoot><tr><td>합계</td><td>' + fmtWon(summary.total) + '</td></tr></tfoot></table>';
+}
+
+function renderMonthTable(data) {
+  if (data.weeks.length === 0) return '<small class="hint">해당 월에 입력된 기록이 없습니다.</small>';
+  let head = '<th>날짜</th>' + data.offeringTypes.map(t => '<th>' + t + '</th>').join('') + '<th>합계</th>';
+  let rows = data.weeks.map(w =>
+    '<tr><td>' + w.date + '</td>' + data.offeringTypes.map(t => '<td>' + fmtWon(w.byType[t]||0) + '</td>').join('') + '<td>' + fmtWon(w.total) + '</td></tr>'
+  ).join('');
+  let footCells = data.offeringTypes.map(t => '<td>' + fmtWon(data.summary.byType[t]) + '</td>').join('');
+  return '<table><thead><tr>' + head + '</tr></thead><tbody>' + rows +
+    '</tbody><tfoot><tr><td>월 합계</td>' + footCells + '<td>' + fmtWon(data.summary.total) + '</td></tr></tfoot></table>';
+}
+
+function renderYearTable(data) {
+  let head = '<th>월</th>' + data.offeringTypes.map(t => '<th>' + t + '</th>').join('') + '<th>합계</th>';
+  let rows = data.months.filter(m => m.total > 0).map(m =>
+    '<tr><td>' + m.month + '월</td>' + data.offeringTypes.map(t => '<td>' + fmtWon(m.byType[t]||0) + '</td>').join('') + '<td>' + fmtWon(m.total) + '</td></tr>'
+  ).join('');
+  if (!rows) rows = '<tr><td colspan="' + (data.offeringTypes.length + 2) + '">해당 연도에 입력된 기록이 없습니다.</td></tr>';
+  let footCells = data.offeringTypes.map(t => '<td>' + fmtWon(data.summary.byType[t]) + '</td>').join('');
+  return '<table><thead><tr>' + head + '</tr></thead><tbody>' + rows +
+    '</tbody><tfoot><tr><td>연간 합계</td>' + footCells + '<td>' + fmtWon(data.summary.total) + '</td></tr></tfoot></table>';
+}
+
+function downloadCSV() {
+  if (!lastReportData) return;
+  const { kind, data } = lastReportData;
+  let csv = '';
+  if (kind === 'week') {
+    csv = '헌금종류,금액\n' + data.offeringTypes.map(t => t + ',' + (data.summary.byType[t]||0)).join('\n') + '\n합계,' + data.summary.total;
+  } else if (kind === 'month') {
+    csv = '날짜,' + data.offeringTypes.join(',') + ',합계\n' +
+      data.weeks.map(w => w.date + ',' + data.offeringTypes.map(t => w.byType[t]||0).join(',') + ',' + w.total).join('\n') +
+      '\n월합계,' + data.offeringTypes.map(t => data.summary.byType[t]).join(',') + ',' + data.summary.total;
+  } else {
+    csv = '월,' + data.offeringTypes.join(',') + ',합계\n' +
+      data.months.filter(m=>m.total>0).map(m => m.month + '월,' + data.offeringTypes.map(t => m.byType[t]||0).join(',') + ',' + m.total).join('\n') +
+      '\n연간합계,' + data.offeringTypes.map(t => data.summary.byType[t]).join(',') + ',' + data.summary.total;
+  }
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '헌금보고서_' + kind + '_' + Date.now() + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function emailReport() {
+  if (!lastReportData) return;
+  const msgEl = document.getElementById('reportMsg');
+  msgEl.innerHTML = '<div class="msg">전송 중...</div>';
+  try {
+    const result = await apiPost('emailReport', Object.assign({ kind: lastReportData.kind }, lastReportData.params));
+    msgEl.innerHTML = '<div class="msg ok">' + result.to + ' 로 전송되었습니다.</div>';
+  } catch (e) {
+    msgEl.innerHTML = '<div class="msg err">전송 실패: ' + e.message + ' (설정 탭에서 수신 이메일을 등록하세요)</div>';
+  }
+}
+
+// ---------- 설정 탭 ----------
+
+async function saveOfferingTypes() {
+  const raw = document.getElementById('offeringTypesInput').value;
+  const types = raw.split(',').map(s => s.trim()).filter(Boolean);
+  const msgEl = document.getElementById('typesMsg');
+  try {
+    await apiPost('updateSettings', { offeringTypes: types });
+    OFFERING_TYPES = types;
+    renderOfferingInputs();
+    msgEl.innerHTML = '<div class="msg ok">저장되었습니다.</div>';
+  } catch (e) {
+    msgEl.innerHTML = '<div class="msg err">저장 실패: ' + e.message + '</div>';
+  }
+}
+
+async function saveReportEmail() {
+  const email = document.getElementById('reportEmailInput').value.trim();
+  const msgEl = document.getElementById('emailMsg');
+  try {
+    await apiPost('updateSettings', { reportEmail: email });
+    msgEl.innerHTML = '<div class="msg ok">저장되었습니다.</div>';
+  } catch (e) {
+    msgEl.innerHTML = '<div class="msg err">저장 실패: ' + e.message + '</div>';
+  }
+}
+
+// ---------- 시작 ----------
+
+if (API_URL && PASSWORD) {
+  initApp().catch(() => showSetup());
+} else {
+  showSetup();
+}
+</script>
+</body>
+</html>
