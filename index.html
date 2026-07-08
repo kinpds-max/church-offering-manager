@@ -289,7 +289,7 @@
           <button class="ghost" type="button" onclick="addMultipleRows()">행 추가</button>
           <button class="primary" type="button" onclick="saveRecord()">저장</button>
         </div>
-        <small class="hint">이름 입력 후 → 또는 Enter로 다음 칸/다음 줄로 이동할 수 있어요. 마지막 줄에서 Enter를 누르면 새 줄이 자동으로 추가됩니다.</small>
+        <small class="hint">이름 입력 후 → 또는 Enter로 다음 칸/다음 줄로 이동할 수 있어요. <b>Shift+Enter</b>를 누르면 다음 줄의 이름 칸으로 바로 이동합니다. 마지막 줄에서 Enter를 누르면 새 줄이 자동으로 추가됩니다.</small>
         <div id="inputMsg"></div>
       </div>
 
@@ -664,11 +664,14 @@ function setupEntryTableKeyboard() {
       e.preventDefault(); focusCell(rowIdx - 1, col);
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // Shift+Enter: 다음 줄의 '이름' 칸(0번째 열)으로 바로 이동
+      // Enter: 같은 칸(열)을 유지한 채 다음 줄로 이동
+      const targetCol = e.shiftKey ? 0 : col;
       if (rowIdx === rows.length - 1) {
         addInputRow(false);
-        setTimeout(() => focusCell(rowIdx + 1, col), 0);
+        setTimeout(() => focusCell(rowIdx + 1, targetCol), 0);
       } else {
-        focusCell(rowIdx + 1, col);
+        focusCell(rowIdx + 1, targetCol);
       }
     }
   });
