@@ -226,6 +226,27 @@ function actionDeleteRecord_(payload) {
   return { deleted: false };
 }
 
+function actionUpdateRecord_(payload) {
+  const sheet = getSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { updated: false };
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === payload.id) {
+      const rowNum = i + 2;
+      if (payload.type !== undefined) sheet.getRange(rowNum, 6).setValue(payload.type);
+      if (payload.name !== undefined) sheet.getRange(rowNum, 7).setValue(payload.name);
+      if (payload.amount !== undefined) {
+        const amt = Number(payload.amount);
+        if (amt > 0) sheet.getRange(rowNum, 8).setValue(amt);
+      }
+      if (payload.note !== undefined) sheet.getRange(rowNum, 9).setValue(payload.note);
+      return { updated: true };
+    }
+  }
+  return { updated: false };
+}
+
 function actionGetWeek_(payload) {
   const dateKey = toDateKey_(payload.date);
   const all = readAllRecords_();
@@ -353,6 +374,7 @@ function routeAction_(action, payload) {
     case 'ping': return { ok: true };
     case 'addRecord': return actionAddRecord_(payload);
     case 'deleteRecord': return actionDeleteRecord_(payload);
+    case 'updateRecord': return actionUpdateRecord_(payload);
     case 'getWeek': return actionGetWeek_(payload);
     case 'getMonth': return actionGetMonth_(payload);
     case 'getYear': return actionGetYear_(payload);

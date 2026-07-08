@@ -279,7 +279,11 @@
         </div>
 
         <div class="row" style="margin-top:10px;">
-          <button class="ghost" type="button" onclick="addInputRow(true)">+ 행 추가</button>
+          <div class="field" style="max-width:110px;">
+            <label>추가할 행 수</label>
+            <input type="number" id="addRowCount" min="1" value="5">
+          </div>
+          <button class="ghost" type="button" onclick="addMultipleRows()">행 추가</button>
           <button class="primary" type="button" onclick="saveRecord()">저장</button>
         </div>
         <small class="hint">이름 입력 후 → 또는 Enter로 다음 칸/다음 줄로 이동할 수 있어요. 마지막 줄에서 Enter를 누르면 새 줄이 자동으로 추가됩니다.</small>
@@ -288,7 +292,26 @@
 
       <div class="card">
         <h2>선택한 날짜의 입력 내역</h2>
-        <div id="dateEntryList" class="entry-list"><small class="hint">날짜를 선택하면 해당 주 입력 내역이 표시됩니다.</small></div>
+        <div class="table-wrap">
+          <table class="entry-table" id="recordsTable">
+            <thead>
+              <tr>
+                <th style="width:16%;">헌금종류</th>
+                <th style="width:18%;">성도 이름</th>
+                <th style="width:16%;">금액</th>
+                <th>비고</th>
+                <th style="width:110px;"></th>
+              </tr>
+            </thead>
+            <tbody id="recordsTableBody">
+              <tr><td colspan="5"><small class="hint">날짜를 선택하면 해당 날짜 입력 내역이 표시됩니다.</small></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="row" style="margin-top:10px; justify-content: space-between; align-items: center;">
+          <div id="recordsTotal" style="font-weight:700;color:var(--navy);"></div>
+          <button class="ghost" type="button" onclick="deleteAllRecords()" style="color:var(--danger);border-color:var(--danger);">전체삭제</button>
+        </div>
       </div>
     </section>
 
@@ -542,6 +565,13 @@ function resetInputTable() {
   addInputRow(false);
 }
 
+function addMultipleRows() {
+  const n = Math.max(1, Math.min(200, Number(document.getElementById('addRowCount').value) || 1));
+  for (let i = 0; i < n; i++) {
+    addInputRow(i === 0);
+  }
+}
+
 function addInputRow(focus) {
   const tbody = document.getElementById('entryTableBody');
   const tr = document.createElement('tr');
@@ -680,33 +710,105 @@ async function saveRecord() {
   }
 }
 
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
 async function refreshDateEntries() {
   const date = document.getElementById('inputDate').value;
-  const listEl = document.getElementById('dateEntryList');
+  const tbody = document.getElementById('recordsTableBody');
+  const totalEl = document.getElementById('recordsTotal');
   if (!date) return;
-  listEl.innerHTML = '<small class="hint">불러오는 중...</small>';
+  tbody.innerHTML = '<tr><td colspan="5"><small class="hint">불러오는 중...</small></td></tr>';
   try {
     const data = await apiGet('getWeek', { date });
     if (data.records.length === 0) {
-      listEl.innerHTML = '<small class="hint">해당 날짜에 입력된 기록이 없습니다.</small>';
+      tbody.innerHTML = '<tr><td colspan="5"><small class="hint">해당 날짜에 입력된 기록이 없습니다.</small></td></tr>';
+      totalEl.textContent = '';
       return;
     }
-    listEl.innerHTML = data.records.map(r =>
-      '<div class="item"><span>' + r.type + ' · ' + (r.name || '이름없음') + ' - ' + fmtWon(r.amount) + (r.note ? ' (' + r.note + ')' : '') + '</span>' +
-      '<button onclick="deleteRecord(\'' + r.id + '\')">삭제</button></div>'
-    ).join('') + '<div class="item" style="border:none;font-weight:700;"><span>합계</span><span>' + fmtWon(data.summary.total) + '</span></div>';
+    tbody.innerHTML = data.records.map(renderRecordRow).join('');
+    totalEl.textContent = '합계: ' + fmtWon(data.summary.total);
   } catch (e) {
-    listEl.innerHTML = '<div class="msg err">불러오기 실패: ' + e.message + '</div>';
+    tbody.innerHTML = '<tr><td colspan="5"><div class="msg err">불러오기 실패: ' + escapeHtml(e.message) + '</div></td></tr>';
   }
 }
 
-async function deleteRecord(id) {
+function renderRecordRow(r) {
+  return '<tr data-id="' + r.id + '">' +
+    '<td>' + escapeHtml(r.type) + '</td>' +
+    '<td>' + escapeHtml(r.name || '') + '</td>' +
+    '<td style="text-align:right;">' + fmtWon(r.amount) + '</td>' +
+    '<td>' + escapeHtml(r.note || '') + '</td>' +
+    '<td style="white-space:nowrap;">' +
+    '<button type="button" class="ghost" style="padding:4px 8px;font-size:12px;" onclick="startEditRow(this)">수정</button> ' +
+    '<button type="button" class="row-del" onclick="deleteRecordRow(this)">삭제</button>' +
+    '</td></tr>';
+}
+
+function startEditRow(btn) {
+  const tr = btn.closest('tr');
+  const cells = tr.querySelectorAll('td');
+  const curType = cells[0].textContent;
+  const curName = cells[1].textContent;
+  const curAmount = cells[2].textContent.replace(/[^0-9.-]/g, '');
+  const curNote = cells[3].textContent;
+  const id = tr.dataset.id;
+
+  cells[0].innerHTML = '<select class="cell-input edit-type">' +
+    OFFERING_TYPES.map(t => '<option value="' + escapeHtml(t) + '"' + (t === curType ? ' selected' : '') + '>' + escapeHtml(t) + '</option>').join('') +
+    '</select>';
+  cells[1].innerHTML = '<input type="text" class="cell-input edit-name" value="' + escapeHtml(curName) + '">';
+  cells[2].innerHTML = '<input type="text" class="cell-input edit-amount" style="text-align:right;" value="' + escapeHtml(curAmount) + '">';
+  cells[3].innerHTML = '<input type="text" class="cell-input edit-note" value="' + escapeHtml(curNote) + '">';
+  cells[4].innerHTML =
+    '<button type="button" class="primary" style="padding:4px 10px;font-size:12px;" onclick="saveEditRow(this, \'' + id + '\')">저장</button> ' +
+    '<button type="button" class="ghost" style="padding:4px 10px;font-size:12px;" onclick="refreshDateEntries()">취소</button>';
+}
+
+async function saveEditRow(btn, id) {
+  const tr = btn.closest('tr');
+  const type = tr.querySelector('.edit-type').value;
+  const name = tr.querySelector('.edit-name').value.trim();
+  const amount = Number(tr.querySelector('.edit-amount').value.replace(/[^0-9.-]/g, ''));
+  const note = tr.querySelector('.edit-note').value.trim();
+  if (!amount || amount <= 0) { alert('금액을 올바르게 입력하세요.'); return; }
+  try {
+    await apiPost('updateRecord', { id: id, type: type, name: name, amount: amount, note: note });
+    refreshDateEntries();
+  } catch (e) {
+    alert('수정 실패: ' + e.message);
+  }
+}
+
+async function deleteRecordRow(btn) {
+  const tr = btn.closest('tr');
+  const id = tr.dataset.id;
   if (!confirm('이 항목을 삭제할까요?')) return;
   try {
-    await apiPost('deleteRecord', { id });
+    await apiPost('deleteRecord', { id: id });
     refreshDateEntries();
   } catch (e) {
     alert('삭제 실패: ' + e.message);
+  }
+}
+
+async function deleteAllRecords() {
+  const date = document.getElementById('inputDate').value;
+  if (!date) return;
+  const rows = document.querySelectorAll('#recordsTableBody tr[data-id]');
+  if (rows.length === 0) { alert('삭제할 항목이 없습니다.'); return; }
+  if (!confirm(date + ' 날짜의 입력 내역 ' + rows.length + '건을 모두 삭제할까요? 되돌릴 수 없습니다.')) return;
+  const ids = Array.from(rows).map(r => r.dataset.id);
+  try {
+    for (const id of ids) {
+      await apiPost('deleteRecord', { id: id });
+    }
+    refreshDateEntries();
+  } catch (e) {
+    alert('전체 삭제 중 오류: ' + e.message);
   }
 }
 
