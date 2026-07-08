@@ -180,6 +180,9 @@
     <button class="primary" onclick="connectSetup()">연결하기</button>
     <div id="setupMsg"></div>
   </div>
+  <footer style="text-align:center;padding:16px;color:var(--muted);font-size:12px;">
+    ⓒ 하맘컨텐츠 · 1660-1195 (문자가능)
+  </footer>
 </div>
 
 <div id="appScreen" class="hidden">
@@ -206,13 +209,24 @@
             <label>날짜 (주일)</label>
             <input type="date" id="inputDate">
           </div>
+          <div class="field">
+            <label>헌금종류</label>
+            <select id="inputType"></select>
+          </div>
+          <div class="field">
+            <label>성도 이름</label>
+            <input type="text" id="inputName" placeholder="이름">
+          </div>
+          <div class="field">
+            <label>금액</label>
+            <input type="number" id="inputAmount" min="0" step="1000" placeholder="0">
+          </div>
         </div>
-        <div class="offering-grid" id="offeringInputs"></div>
         <div class="field full" style="margin-bottom:12px;">
           <label>비고</label>
-          <textarea id="inputNote" placeholder="특이사항이 있으면 입력하세요"></textarea>
+          <input type="text" id="inputNote" placeholder="특이사항이 있으면 입력하세요 (선택)">
         </div>
-        <button class="primary" onclick="saveRecord()">저장</button>
+        <button class="primary" onclick="saveRecord()">추가</button>
         <div id="inputMsg"></div>
       </div>
 
@@ -298,6 +312,9 @@
       </div>
     </section>
   </main>
+  <footer style="text-align:center;padding:16px;color:var(--muted);font-size:12px;">
+    ⓒ 하맘컨텐츠 · 1660-1195 (문자가능)
+  </footer>
 </div>
 
 <script>
@@ -434,14 +451,8 @@ function switchTab(tab) {
 }
 
 function renderOfferingInputs() {
-  const wrap = document.getElementById('offeringInputs');
-  wrap.innerHTML = '';
-  OFFERING_TYPES.forEach(type => {
-    const div = document.createElement('div');
-    div.className = 'field';
-    div.innerHTML = '<label>' + type + '</label><input type="number" min="0" step="1000" data-type="' + type + '" placeholder="0">';
-    wrap.appendChild(div);
-  });
+  const sel = document.getElementById('inputType');
+  sel.innerHTML = OFFERING_TYPES.map(t => '<option value="' + t + '">' + t + '</option>').join('');
 }
 
 function populateYearSelects() {
@@ -461,22 +472,22 @@ function populateYearSelects() {
 
 async function saveRecord() {
   const date = document.getElementById('inputDate').value;
-  const note = document.getElementById('inputNote').value;
+  const type = document.getElementById('inputType').value;
+  const name = document.getElementById('inputName').value.trim();
+  const amount = Number(document.getElementById('inputAmount').value);
+  const note = document.getElementById('inputNote').value.trim();
   const msgEl = document.getElementById('inputMsg');
-  if (!date) { msgEl.innerHTML = '<div class="msg err">날짜를 선택하세요.</div>'; return; }
 
-  const entries = [];
-  document.querySelectorAll('#offeringInputs input').forEach(inp => {
-    const amount = Number(inp.value);
-    if (amount > 0) entries.push({ type: inp.dataset.type, amount: amount });
-  });
-  if (entries.length === 0) { msgEl.innerHTML = '<div class="msg err">최소 한 항목 이상 금액을 입력하세요.</div>'; return; }
+  if (!date) { msgEl.innerHTML = '<div class="msg err">날짜를 선택하세요.</div>'; return; }
+  if (!type) { msgEl.innerHTML = '<div class="msg err">헌금종류를 선택하세요.</div>'; return; }
+  if (!amount || amount <= 0) { msgEl.innerHTML = '<div class="msg err">금액을 입력하세요.</div>'; return; }
 
   msgEl.innerHTML = '<div class="msg">저장 중...</div>';
   try {
-    const result = await apiPost('addRecord', { date, note, entries });
-    msgEl.innerHTML = '<div class="msg ok">' + result.added + '건 저장되었습니다.</div>';
-    document.querySelectorAll('#offeringInputs input').forEach(inp => inp.value = '');
+    const result = await apiPost('addRecord', { date: date, entries: [{ type: type, name: name, amount: amount, note: note }] });
+    msgEl.innerHTML = '<div class="msg ok">저장되었습니다.</div>';
+    document.getElementById('inputName').value = '';
+    document.getElementById('inputAmount').value = '';
     document.getElementById('inputNote').value = '';
     refreshDateEntries();
   } catch (e) {
@@ -496,7 +507,7 @@ async function refreshDateEntries() {
       return;
     }
     listEl.innerHTML = data.records.map(r =>
-      '<div class="item"><span>' + r.type + ' - ' + fmtWon(r.amount) + (r.note ? ' (' + r.note + ')' : '') + '</span>' +
+      '<div class="item"><span>' + r.type + ' · ' + (r.name || '이름없음') + ' - ' + fmtWon(r.amount) + (r.note ? ' (' + r.note + ')' : '') + '</span>' +
       '<button onclick="deleteRecord(\'' + r.id + '\')">삭제</button></div>'
     ).join('') + '<div class="item" style="border:none;font-weight:700;"><span>합계</span><span>' + fmtWon(data.summary.total) + '</span></div>';
   } catch (e) {

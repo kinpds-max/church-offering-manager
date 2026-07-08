@@ -18,12 +18,16 @@
  * GitHub Pages 등 외부 도메인에서 fetch()로 호출하면 브라우저 CORS 정책에
  * 막히는 경우가 있어, 모든 요청(조회/저장/삭제 포함)을 GET + JSONP 방식으로
  * 처리합니다. entries/offeringTypes 같은 배열 값은 JSON 문자열로 전달됩니다.
+ *
+ * [기록 항목]
+ * 각 헌금 기록은 날짜, 헌금종류, 성도이름, 금액, 비고로 구성됩니다.
  */
 
 const SPREADSHEET_ID = ''; // 독립 실행형으로 쓸 경우 여기에 스프레드시트 ID를 입력하세요
 const SHEET_NAME = '헌금기록';
 const SETTINGS_SHEET_NAME = '설정';
-const DEFAULT_OFFERING_TYPES = ['십일조', '감사헌금', '주일헌금', '선교헌금', '건축헌금'];
+const HEADERS = ['ID', '날짜', '년도', '월', '주차(월중)', '헌금종류', '성도이름', '금액', '비고', '입력시각'];
+const DEFAULT_OFFERING_TYPES = ['십일조', '주일헌금', '감사헌금', '선교헌금', '건축헌금', '특별헌금'];
 
 function getSpreadsheet_() {
   if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -39,9 +43,17 @@ function setupSheet() {
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
   }
+
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['ID', '날짜', '년도', '월', '주차(월중)', '헌금종류', '금액', '비고', '입력시각']);
+    sheet.appendRow(HEADERS);
     sheet.setFrozenRows(1);
+  } else {
+    // 기존 시트 마이그레이션: '성도이름' 컬럼이 없으면 헌금종류(F열) 뒤에 추가
+    const existingHeader = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+    if (existingHeader.indexOf('성도이름') === -1) {
+      sheet.insertColumnAfter(6);
+      sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    }
   }
 
   let settingsSheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
@@ -148,7 +160,7 @@ function readAllRecords_() {
   const sheet = getSheet_();
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  const values = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+  const values = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
   return values.map((row, idx) => ({
     rowIndex: idx + 2,
     id: row[0],
@@ -157,9 +169,10 @@ function readAllRecords_() {
     month: row[3],
     weekOfMonth: row[4],
     type: row[5],
-    amount: Number(row[6]) || 0,
-    note: row[7],
-    enteredAt: row[8]
+    name: row[6],
+    amount: Number(row[7]) || 0,
+    note: row[8],
+    enteredAt: row[9]
   })).filter(r => r.date);
 }
 
@@ -184,7 +197,7 @@ function actionAddRecord_(payload) {
   const year = d.getFullYear();
   const month = d.getMonth() + 1;
   const wom = weekOfMonth_(d);
-  const entries = payload.entries || [];
+  const entries = payload.entries || []; // [{type, name, amount, note}]
   const now = new Date();
   let added = 0;
 
@@ -192,7 +205,7 @@ function actionAddRecord_(payload) {
     const amount = Number(entry.amount);
     if (!entry.type || !amount || amount <= 0) return;
     const id = Utilities.getUuid();
-    sheet.appendRow([id, dateKey, year, month, wom, entry.type, amount, payload.note || '', now]);
+    sheet.appendRow([id, dateKey, year, month, wom, entry.type, entry.name || '', amount, entry.note || '', now]);
     added++;
   });
 
