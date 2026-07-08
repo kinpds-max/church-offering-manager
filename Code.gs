@@ -1,11 +1,13 @@
 /**
  * 교회 재정실 헌금관리 시스템 - Apps Script 백엔드
  * -----------------------------------------------------
- * 이 스크립트는 Google 스프레드시트에 바인딩하여 사용합니다.
- * 웹앱(index.html)에서 fetch로 이 스크립트의 웹앱 URL을 호출합니다.
+ * 이 스크립트는 두 가지 방식으로 쓸 수 있습니다.
+ *  A) 스프레드시트에 바인딩 (확장 프로그램 > Apps Script) → SPREADSHEET_ID를 비워두면 됩니다.
+ *  B) 독립 실행형 스크립트 (script.google.com에서 새 프로젝트) → 아래 SPREADSHEET_ID에
+ *     스프레드시트 URL의 /d/ 와 /edit 사이 부분(ID)을 붙여넣으세요.
  *
  * [처음 설치 시 1회 실행]
- * 1) 이 코드를 스프레드시트의 확장 프로그램 > Apps Script 에 붙여넣기
+ * 1) 이 코드를 Apps Script 편집기에 붙여넣기 (필요하면 SPREADSHEET_ID 입력)
  * 2) 상단 함수 선택 드롭다운에서 setupSheet 선택 후 실행(▶) → 권한 승인
  * 3) 배포 > 새 배포 > 웹 앱으로 배포
  *    - 실행 계정: 나(Me)
@@ -13,14 +15,20 @@
  * 4) 배포 후 나오는 웹 앱 URL을 index.html 설정 화면에 입력
  */
 
+const SPREADSHEET_ID = ''; // 독립 실행형으로 쓸 경우 여기에 스프레드시트 ID를 입력하세요
 const SHEET_NAME = '헌금기록';
 const SETTINGS_SHEET_NAME = '설정';
 const DEFAULT_OFFERING_TYPES = ['십일조', '감사헌금', '주일헌금', '선교헌금', '건축헌금'];
 
+function getSpreadsheet_() {
+  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
 // ---------- 초기 설정 ----------
 
 function setupSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet_();
 
   let sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) {
@@ -66,14 +74,14 @@ function resetPasswordPrompt() {
 // ---------- 공통 유틸 ----------
 
 function getSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet_();
   const sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) throw new Error('시트가 초기화되지 않았습니다. setupSheet를 먼저 실행하세요.');
   return sheet;
 }
 
 function getSettingsMap_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet_();
   const sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
   const map = {};
   if (!sheet) return map;
@@ -85,7 +93,7 @@ function getSettingsMap_() {
 }
 
 function setSetting_(key, value) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet_();
   let sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(SETTINGS_SHEET_NAME);
@@ -381,7 +389,7 @@ function doPost(e) {
 }
 
 function setupIfNeeded_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet_();
   if (!ss.getSheetByName(SHEET_NAME)) {
     setupSheet();
   }
