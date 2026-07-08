@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>재정실 헌금관리</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
   :root {
     --navy: #1f3a5f;
@@ -207,6 +208,8 @@
     font-size: 15px;
     padding: 4px 8px;
   }
+  .chart-box { position: relative; height: 280px; margin-bottom: 24px; }
+  .chart-box:last-child { margin-bottom: 0; }
   @media print {
     header, nav, .no-print { display: none !important; }
     main { margin: 0; max-width: 100%; }
@@ -354,7 +357,30 @@
 
       <div class="card" id="reportResultCard" style="display:none;">
         <h2 id="reportTitle"></h2>
-        <div id="reportTable"></div>
+
+        <div class="period-toggle no-print" style="margin-bottom:16px;">
+          <button data-subview="summary" class="active" onclick="setSubView('summary')">합계</button>
+          <button data-subview="chart" onclick="setSubView('chart')">그래픽</button>
+          <button data-subview="detail" onclick="setSubView('detail')">세부보고서</button>
+        </div>
+
+        <div id="subview-summary">
+          <div id="reportTable"></div>
+        </div>
+
+        <div id="subview-chart" class="hidden">
+          <div class="chart-box">
+            <canvas id="typeChart"></canvas>
+          </div>
+          <div class="chart-box" id="trendChartBox">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+
+        <div id="subview-detail" class="hidden">
+          <div id="reportDetailTable"></div>
+        </div>
+
         <div class="report-actions no-print">
           <button class="ghost" onclick="downloadCSV()">CSV 다운로드</button>
           <button class="ghost" onclick="window.print()">인쇄 / PDF 저장</button>
@@ -814,13 +840,30 @@ async function deleteAllRecords() {
 
 // ---------- 보고서 탭 ----------
 
+let currentSubView = 'summary';
+let typeChartInstance = null;
+let trendChartInstance = null;
+
+const CHART_COLORS = ['#1f3a5f', '#b8934a', '#2f7d52', '#6b8caf', '#c0463f', '#7a5ea8', '#d68a3a', '#4a90a4'];
+
 function setPeriod(p) {
   currentPeriod = p;
-  document.querySelectorAll('.period-toggle button').forEach(b => b.classList.toggle('active', b.dataset.period === p));
+  document.querySelectorAll('.period-toggle button[data-period]').forEach(b => b.classList.toggle('active', b.dataset.period === p));
   ['week','month','year'].forEach(pp => {
     document.getElementById('periodControls-' + pp).classList.toggle('hidden', pp !== p);
   });
   document.getElementById('reportResultCard').style.display = 'none';
+}
+
+function setSubView(view) {
+  currentSubView = view;
+  document.querySelectorAll('.period-toggle button[data-subview]').forEach(b => b.classList.toggle('active', b.dataset.subview === view));
+  ['summary', 'chart', 'detail'].forEach(v => {
+    document.getElementById('subview-' + v).classList.toggle('hidden', v !== view);
+  });
+  if (view === 'chart' && lastReportData) {
+    renderChartView(lastReportData.kind, lastReportData.data);
+  }
 }
 
 async function loadReport() {
@@ -833,28 +876,128 @@ async function loadReport() {
   tableEl.innerHTML = '<small class="hint">불러오는 중...</small>';
 
   try {
+    let kind, params, data, title;
     if (currentPeriod === 'week') {
       const date = document.getElementById('reportWeekDate').value;
-      const data = await apiGet('getWeek', { date });
-      lastReportData = { kind: 'week', params: { date }, data };
-      titleEl.textContent = '주별 보고서 - ' + date;
-      tableEl.innerHTML = renderTypeTable(data.summary, data.offeringTypes);
+      data = await apiGet('getWeek', { date });
+      kind = 'week'; params = { date };
+      title = '주별 보고서 - ' + date;
     } else if (currentPeriod === 'month') {
       const year = document.getElementById('reportYearM').value;
       const month = document.getElementById('reportMonth').value;
-      const data = await apiGet('getMonth', { year, month });
-      lastReportData = { kind: 'month', params: { year, month }, data };
-      titleEl.textContent = '월별 보고서 - ' + year + '년 ' + month + '월';
-      tableEl.innerHTML = renderMonthTable(data);
+      data = await apiGet('getMonth', { year, month });
+      kind = 'month'; params = { year, month };
+      title = '월별 보고서 - ' + year + '년 ' + month + '월';
     } else {
       const year = document.getElementById('reportYearY').value;
-      const data = await apiGet('getYear', { year });
-      lastReportData = { kind: 'year', params: { year }, data };
-      titleEl.textContent = '연간 보고서 - ' + year + '년';
-      tableEl.innerHTML = renderYearTable(data);
+      data = await apiGet('getYear', { year });
+      kind = 'year'; params = { year };
+      title = '연간 보고서 - ' + year + '년';
+    }
+    lastReportData = { kind: kind, params: params, data: data };
+    titleEl.textContent = title;
+
+    if (kind === 'week') tableEl.innerHTML = renderTypeTable(data.summary, data.offeringTypes);
+    else if (kind === 'month') tableEl.innerHTML = renderMonthTable(data);
+    else tableEl.innerHTML = renderYearTable(data);
+
+    document.getElementById('reportDetailTable').innerHTML = renderDetailTable(kind, data);
+
+    if (currentSubView === 'chart') {
+      renderChartView(kind, data);
     }
   } catch (e) {
     tableEl.innerHTML = '<div class="msg err">불러오기 실패: ' + e.message + '</div>';
+  }
+}
+
+function renderDetailTable(kind, data) {
+  let records;
+  if (kind === 'week') records = data.records || [];
+  else records = data.records || [];
+
+  if (records.length === 0) {
+    return '<small class="hint">세부 내역이 없습니다.</small>';
+  }
+  const showDate = kind !== 'week';
+  const rows = records.map(r =>
+    '<tr>' +
+    (showDate ? '<td>' + escapeHtml(r.date) + '</td>' : '') +
+    '<td>' + escapeHtml(r.type) + '</td>' +
+    '<td>' + escapeHtml(r.name || '') + '</td>' +
+    '<td style="text-align:right;">' + fmtWon(r.amount) + '</td>' +
+    '<td>' + escapeHtml(r.note || '') + '</td>' +
+    '</tr>'
+  ).join('');
+  return '<div class="table-wrap"><table><thead><tr>' +
+    (showDate ? '<th>날짜</th>' : '') +
+    '<th>헌금종류</th><th>성함</th><th>금액</th><th>비고</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function renderChartView(kind, data) {
+  const types = data.offeringTypes;
+  const typeCtx = document.getElementById('typeChart');
+  if (typeChartInstance) { typeChartInstance.destroy(); }
+  typeChartInstance = new Chart(typeCtx, {
+    type: 'doughnut',
+    data: {
+      labels: types,
+      datasets: [{
+        data: types.map(t => data.summary.byType[t] || 0),
+        backgroundColor: types.map((_, i) => CHART_COLORS[i % CHART_COLORS.length])
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: '헌금종류별 비중' },
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+
+  const trendBox = document.getElementById('trendChartBox');
+  const trendCtx = document.getElementById('trendChart');
+  if (trendChartInstance) { trendChartInstance.destroy(); trendChartInstance = null; }
+
+  if (kind === 'week') {
+    trendBox.classList.add('hidden');
+  } else {
+    trendBox.classList.remove('hidden');
+    let labels, values, chartTitle;
+    if (kind === 'month') {
+      labels = data.weeks.map(w => w.date);
+      values = data.weeks.map(w => w.total);
+      chartTitle = '주별 합계 추이';
+    } else {
+      labels = data.months.map(m => m.month + '월');
+      values = data.months.map(m => m.total);
+      chartTitle = '월별 합계 추이';
+    }
+    trendChartInstance = new Chart(trendCtx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '합계',
+          data: values,
+          backgroundColor: '#1f3a5f'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: chartTitle },
+          legend: { display: false }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString('ko-KR') } }
+        }
+      }
+    });
   }
 }
 

@@ -274,7 +274,8 @@ function actionGetMonth_(payload) {
   });
 
   const summary = sumByType_(records, types);
-  return { year: year, month: month, weeks: weeks, summary: summary, offeringTypes: types };
+  const sortedRecords = records.slice().sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+  return { year: year, month: month, weeks: weeks, summary: summary, offeringTypes: types, records: sortedRecords };
 }
 
 function actionGetYear_(payload) {
@@ -294,7 +295,8 @@ function actionGetYear_(payload) {
   }
 
   const summary = sumByType_(records, types);
-  return { year: year, months: months, summary: summary, offeringTypes: types };
+  const sortedRecords = records.slice().sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+  return { year: year, months: months, summary: summary, offeringTypes: types, records: sortedRecords };
 }
 
 function actionGetMonthsWithData_(payload) {
