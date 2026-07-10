@@ -924,9 +924,11 @@ async function loadReport() {
 }
 
 function renderDetailTable(kind, data) {
-  let records;
-  if (kind === 'week') records = data.records || [];
-  else records = data.records || [];
+  if (data.records === undefined) {
+    return '<div class="msg err">세부 내역을 보려면 Apps Script를 최신 코드로 다시 배포해야 합니다. ' +
+      '(Apps Script 편집기 → 배포 → 배포 관리 → 편집 → 새 버전으로 배포)</div>';
+  }
+  const records = data.records || [];
 
   if (records.length === 0) {
     return '<small class="hint">세부 내역이 없습니다.</small>';
